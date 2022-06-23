@@ -1,3 +1,2 @@
 POSTS_AMOUNT: int = 10
 LEN_STR: int = 15
-POSTS_AMOUNT_TEST: int = 3

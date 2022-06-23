@@ -23,7 +23,6 @@ class PostURLTests(TestCase):
         )
 
     def setUp(self):
-        self.guest_client = Client()
         self.user = User.objects.create_user(username='HasNoName')
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
@@ -40,7 +39,7 @@ class PostURLTests(TestCase):
         ]
         for url in urls:
             with self.subTest(url=url):
-                responce = self.guest_client.get(url)
+                responce = self.client.get(url)
                 self.assertEqual(responce.status_code, HTTPStatus.OK)
 
     def test_urls_exist_at_desired_location_auth(self):
@@ -65,7 +64,7 @@ class PostURLTests(TestCase):
 
     def test_url_unexisting_page(self):
         """Проверка запроса к несуществующей странице"""
-        response = self.guest_client.get('/unexisting-page/')
+        response = self.client.get('/unexisting-page/')
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     def test_post_edit_url_redirect_no_author_on_post_detail(self):
@@ -83,7 +82,7 @@ class PostURLTests(TestCase):
         }
         for url, redirect in urls.items():
             with self.subTest(url=url):
-                response = self.guest_client.get(url, follow=True)
+                response = self.client.get(url, follow=True)
                 self.assertRedirects(response, redirect)
 
     def test_urls_uses_correct_template(self):

@@ -9,7 +9,6 @@ User = get_user_model()
 class UsersViewTest(TestCase):
 
     def setUp(self):
-        self.guest_client = Client()
         self.user = User.objects.create_user(username='HasNoName')
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
@@ -42,7 +41,7 @@ class UsersViewTest(TestCase):
 
     def test_signup_correct_context(self):
         """Шаблон signup сформирован с правильным контекстом."""
-        response = (self.guest_client.get(
+        response = (self.client.get(
             reverse('users:signup')))
         form_fields = {
             'first_name': forms.fields.CharField,

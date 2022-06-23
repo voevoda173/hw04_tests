@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import TestCase
 from django.urls import reverse
 
 from ..forms import CreationForm
@@ -13,9 +13,6 @@ class CreationFormTest(TestCase):
         super().setUpClass()
         cls.user = User.objects.create_user(username='test_username')
         cls.form = CreationForm()
-
-    def setUp(self):
-        self.client = Client()
 
     def test_create_new_user(self):
         """При заполнении формы создается новый пользователь."""

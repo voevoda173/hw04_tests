@@ -8,7 +8,6 @@ User = get_user_model()
 
 class UserURLTests(TestCase):
     def setUp(self):
-        self.guest_client = Client()
         self.user = User.objects.create_user(username='HasNoName')
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
@@ -26,7 +25,7 @@ class UserURLTests(TestCase):
         ]
         for url in urls:
             with self.subTest(url=url):
-                responce = self.guest_client.get(url)
+                responce = self.client.get(url)
                 self.assertEqual(responce.status_code, HTTPStatus.OK)
 
     def test_urls_exist_at_desired_location_auth(self):
@@ -42,7 +41,7 @@ class UserURLTests(TestCase):
 
     def test_url_unexisting_page(self):
         """Проверка запроса к несуществующей странице"""
-        response = self.guest_client.get('/auth/unexisting-page/')
+        response = self.client.get('/auth/unexisting-page/')
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     def test_password_change_url_redirect_anonymus_on_login(self):
@@ -56,7 +55,7 @@ class UserURLTests(TestCase):
         }
         for url, redirect in urls.items():
             with self.subTest(url=url):
-                response = self.guest_client.get(url, follow=True)
+                response = self.client.get(url, follow=True)
                 self.assertRedirects(response, redirect)
 
     def test_urls_uses_correct_template(self):

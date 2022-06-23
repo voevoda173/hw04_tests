@@ -16,20 +16,22 @@ class PostModelTest(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user,
-            text='Тестовая пост',
+            text='Тестовый пост' * 5,
         )
 
     def test_model_post_have_correct_object_names(self):
-        """Проверяем, что у модели Post корректно работает __str__."""
+        """Проверяем, что в моделях корректно работает __str__."""
         post = PostModelTest.post
-        text = post.text[:LEN_STR]
-        self.assertEqual(text, str(post))
-
-    def test_model_group_have_correct_object_names(self):
-        """Проверяем, что у модели Group корректно работает __str__."""
         group = PostModelTest.group
+        text = post.text[:LEN_STR]
         title = group.title
-        self.assertEqual(title, str(group))
+        model_fields = {
+            text: post,
+            title: group,
+        }
+        for field, expected_value in model_fields.items():
+            with self.subTest(field=field):
+                self.assertEqual(field, str(expected_value))
 
     def test_verbose_name(self):
         """verbose_name в полях совпадает с ожидаемым."""

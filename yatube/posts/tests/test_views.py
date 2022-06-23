@@ -2,7 +2,7 @@ from django import forms
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from ..constants import POSTS_AMOUNT, POSTS_AMOUNT_TEST
+from ..constants import POSTS_AMOUNT
 from ..models import Group, Post, User
 
 
@@ -16,14 +16,16 @@ class PostPagesTest(TestCase):
             slug='test-slug',
             description='Тестовое описание',
         )
-        cls.post = Post.objects.create(
-            text='Тестовый текст',
-            author=cls.user_author,
-            group=cls.group,
-        )
+        cls.post = [
+            Post.objects.create(
+                text='Тестовый текст',
+                author=cls.user_author,
+                group=cls.group,
+            )
+            for i in range(2)
+        ]
 
     def setUp(self):
-        self.guest_client = Client()
         self.user = User.objects.create_user(username='HasNoName')
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
@@ -36,12 +38,12 @@ class PostPagesTest(TestCase):
             reverse('posts:index'): 'posts/index.html',
             reverse('posts:profile', kwargs={'username': self.user_author}):
             'posts/profile.html',
-            reverse('posts:post_detail', kwargs={'post_id': self.post.id}):
+            reverse('posts:post_detail', kwargs={'post_id': self.post[0].id}):
             'posts/post_detail.html',
             reverse('posts:group_list', kwargs={'slug': self.group.slug}):
             'posts/group_list.html',
             reverse('posts:post_create'): 'posts/create_post.html',
-            reverse('posts:post_edit', kwargs={'post_id': self.post.id}):
+            reverse('posts:post_edit', kwargs={'post_id': self.post[0].id}):
             'posts/create_post.html',
         }
         for reverse_name, template in templates_pages_names.items():
@@ -49,29 +51,40 @@ class PostPagesTest(TestCase):
                 response = self.author_client.get(reverse_name)
                 self.assertTemplateUsed(response, template)
 
+    def check_pages_show_correct_context(self, response):
+        """Проверка правильности формирования контекста."""
+        first_object = response.context['page_obj'][0]
+        context_objects = {
+            first_object.text: self.post[1].text,
+            first_object.author: self.post[1].author,
+            first_object.group: self.post[1].group,
+        }
+        for response_name, reverse_name in context_objects.items():
+            with self.subTest(reverse_name=reverse_name):
+                self.assertEqual(response_name, reverse_name)
+
     def test_index_page_show_correct_context(self):
         """Шаблон index сформирован с правильным контекстом."""
         response = self.author_client.get(reverse('posts:index'))
-        self.assertEqual(
-            response.context['page_obj'].object_list[0], self.post)
+        self.check_pages_show_correct_context(response)
 
     def test_group_list_show_correct_context(self):
         """Шаблон group_list сформирован с правильным контекстом."""
         response = (self.author_client.get(reverse('posts:group_list',
                     kwargs={'slug': self.group.slug})))
-        self.assertEqual(response.context.get('group'), self.group)
+        self.check_pages_show_correct_context(response)
 
     def test_profile_show_correct_context(self):
         """Шаблон profile сформирован с правильным контекстом."""
         response = (self.author_client.get(reverse('posts:profile',
-                    kwargs={'username': self.post.author})))
-        self.assertEqual(response.context.get('author'), self.user_author)
+                    kwargs={'username': self.post[0].author})))
+        self.check_pages_show_correct_context(response)
 
     def test_post_detail_show_correct_context(self):
         """Шаблон post_detail сформирован с правильным контестом."""
         response = (self.author_client.get(reverse('posts:post_detail',
-                    kwargs={'post_id': self.post.id})))
-        self.assertEqual(response.context.get('post'), self.post)
+                    kwargs={'post_id': self.post[0].id})))
+        self.assertEqual(response.context.get('post'), self.post[0])
 
     def test_create_post_show_correct_context(self):
         """Шаблон create_post сформирован с правильным контекстом."""
@@ -89,7 +102,7 @@ class PostPagesTest(TestCase):
         """Шаблон create_post сформирован с правильным контекстом
         при редактировании поста."""
         response = (self.author_client.get(reverse('posts:post_edit',
-                    kwargs={'post_id': self.post.id})))
+                    kwargs={'post_id': self.post[0].id})))
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField,
@@ -101,6 +114,11 @@ class PostPagesTest(TestCase):
 
     def test_check_post_on_create(self):
         """Проверка, что пост правильно добавляется на страницы."""
+        post = Post.objects.create(
+            text='Тестовый текст',
+            author=self.user_author,
+            group=self.group,
+        )
         pages = [
             reverse('posts:index'),
             reverse('posts:group_list', kwargs={'slug': self.group.slug}),
@@ -109,8 +127,8 @@ class PostPagesTest(TestCase):
         for address in pages:
             with self.subTest(address=address):
                 response = self.author_client.get(address)
-                self.assertEquals(response.context.get('page_obj')[0],
-                                  self.post)
+                self.assertEqual(response.context.get('page_obj')[0],
+                                 post)
 
     def test_group(self):
         """Проверка, что пост не попал в группу, для которой
@@ -135,41 +153,37 @@ class PaginatorViewTest(TestCase):
             slug='test-slug',
             description='Тестовое описание',
         )
-
-        for i in range(13):
+        cls.first_page_len_posts = POSTS_AMOUNT
+        cls.second_page_len_posts = 3
+        cls.post = [
             Post.objects.create(
                 text=f'Тестовый текст {i}',
                 author=cls.user_author,
                 group=cls.group,
             )
+            for i in range(
+                cls.first_page_len_posts + cls.second_page_len_posts)
+        ]
 
     def setUp(self):
         self.client = Client()
 
-    def test_first_page_contains_ten_records(self):
-        """Первая страница index содержит десять записей."""
-        pages_with_pagination = [
-            reverse('posts:index'),
-            reverse('posts:group_list', kwargs={'slug': self.group.slug}),
-            reverse('posts:profile', kwargs={'username': self.user_author}),
-        ]
-        for address in pages_with_pagination:
-            with self.subTest(address=address):
-                response = self.client.get(address)
-                self.assertEqual(
-                    len(response.context['page_obj']), POSTS_AMOUNT)
-
-    def test_second_page_contains_three_records(self):
-        """Вторая страница index содердит три записи."""
-        pages_with_pagination = [
-            reverse('posts:index') + '?page=2',
+    def test_pages_pagination(self):
+        """Проверка правильности вывода количества постов на страницах."""
+        pages_with_pagination = {
+            reverse('posts:index'): self.first_page_len_posts,
+            reverse('posts:index') + '?page=2': self.second_page_len_posts,
+            reverse('posts:group_list', kwargs={'slug': self.group.slug}):
+            self.first_page_len_posts,
             reverse('posts:group_list', kwargs={'slug': self.group.slug})
-            + '?page=2',
+            + '?page=2': self.second_page_len_posts,
+            reverse('posts:profile', kwargs={'username': self.user_author}):
+            self.first_page_len_posts,
             reverse('posts:profile', kwargs={'username': self.user_author})
-            + '?page=2',
-        ]
-        for address in pages_with_pagination:
+            + '?page=2': self.second_page_len_posts,
+        }
+        for address, len_posts in pages_with_pagination.items():
             with self.subTest(address=address):
                 response = self.client.get(address)
                 self.assertEqual(
-                    len(response.context['page_obj']), POSTS_AMOUNT_TEST)
+                    len(response.context['page_obj']), len_posts)
