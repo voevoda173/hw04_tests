@@ -16,14 +16,16 @@ class PostPagesTest(TestCase):
             slug='test-slug',
             description='Тестовое описание',
         )
-        cls.post = [
-            Post.objects.create(
-                text='Тестовый текст',
+        cls.posts = [
+            Post(
+                text=f'Тестовый текст {i}',
                 author=cls.user_author,
                 group=cls.group,
             )
             for i in range(2)
         ]
+        Post.objects.bulk_create(cls.posts)
+        cls.posts = Post.objects.select_related('author', 'group')
 
     def setUp(self):
         self.user = User.objects.create_user(username='HasNoName')
@@ -36,14 +38,18 @@ class PostPagesTest(TestCase):
         """URL-адрес использует соответствующий шаблон.(posts)."""
         templates_pages_names = {
             reverse('posts:index'): 'posts/index.html',
-            reverse('posts:profile', kwargs={'username': self.user_author}):
+            reverse('posts:profile',
+                    kwargs={'username': self.user_author}):
             'posts/profile.html',
-            reverse('posts:post_detail', kwargs={'post_id': self.post[0].id}):
+            reverse('posts:post_detail',
+                    kwargs={'post_id': self.posts[0].id}):
             'posts/post_detail.html',
-            reverse('posts:group_list', kwargs={'slug': self.group.slug}):
+            reverse('posts:group_list',
+                    kwargs={'slug': self.group.slug}):
             'posts/group_list.html',
             reverse('posts:post_create'): 'posts/create_post.html',
-            reverse('posts:post_edit', kwargs={'post_id': self.post[0].id}):
+            reverse('posts:post_edit',
+                    kwargs={'post_id': self.posts[0].id}):
             'posts/create_post.html',
         }
         for reverse_name, template in templates_pages_names.items():
@@ -55,9 +61,9 @@ class PostPagesTest(TestCase):
         """Проверка правильности формирования контекста."""
         first_object = response.context['page_obj'][0]
         context_objects = {
-            first_object.text: self.post[1].text,
-            first_object.author: self.post[1].author,
-            first_object.group: self.post[1].group,
+            first_object.text: self.posts[0].text,
+            first_object.author.id: self.posts[0].author.id,
+            first_object.group.slug: self.posts[0].group.slug,
         }
         for response_name, reverse_name in context_objects.items():
             with self.subTest(reverse_name=reverse_name):
@@ -72,19 +78,22 @@ class PostPagesTest(TestCase):
         """Шаблон group_list сформирован с правильным контекстом."""
         response = (self.author_client.get(reverse('posts:group_list',
                     kwargs={'slug': self.group.slug})))
+        self.assertEqual(response.context['group'], self.group)
         self.check_pages_show_correct_context(response)
 
     def test_profile_show_correct_context(self):
         """Шаблон profile сформирован с правильным контекстом."""
         response = (self.author_client.get(reverse('posts:profile',
-                    kwargs={'username': self.post[0].author})))
+                    kwargs={'username': self.user_author.username})))
+        self.assertEqual(response.context['author'], self.user_author)
         self.check_pages_show_correct_context(response)
 
     def test_post_detail_show_correct_context(self):
         """Шаблон post_detail сформирован с правильным контестом."""
         response = (self.author_client.get(reverse('posts:post_detail',
-                    kwargs={'post_id': self.post[0].id})))
-        self.assertEqual(response.context.get('post'), self.post[0])
+                    kwargs={'post_id': self.posts[0].id})))
+        self.assertEqual(response.context.get('post'),
+                         self.posts[0])
 
     def test_create_post_show_correct_context(self):
         """Шаблон create_post сформирован с правильным контекстом."""
@@ -102,7 +111,7 @@ class PostPagesTest(TestCase):
         """Шаблон create_post сформирован с правильным контекстом
         при редактировании поста."""
         response = (self.author_client.get(reverse('posts:post_edit',
-                    kwargs={'post_id': self.post[0].id})))
+                    kwargs={'post_id': self.posts[0].id})))
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField,
@@ -121,14 +130,15 @@ class PostPagesTest(TestCase):
         )
         pages = [
             reverse('posts:index'),
-            reverse('posts:group_list', kwargs={'slug': self.group.slug}),
-            reverse('posts:profile', kwargs={'username': self.user_author}),
+            reverse('posts:group_list',
+                    kwargs={'slug': self.group.slug}),
+            reverse('posts:profile',
+                    kwargs={'username': self.user_author}),
         ]
         for address in pages:
             with self.subTest(address=address):
                 response = self.author_client.get(address)
-                self.assertEqual(response.context.get('page_obj')[0],
-                                 post)
+                self.assertEqual(response.context.get('page_obj')[0], post)
 
     def test_group(self):
         """Проверка, что пост не попал в группу, для которой
@@ -140,7 +150,7 @@ class PostPagesTest(TestCase):
         )
         response = self.author_client.get(reverse('posts:group_list',
                                           args=[fake_group.slug]))
-        self.assertNotIn(self.post, response.context['page_obj'])
+        self.assertNotIn(self.posts, response.context['page_obj'])
 
 
 class PaginatorViewTest(TestCase):
@@ -155,8 +165,8 @@ class PaginatorViewTest(TestCase):
         )
         cls.first_page_len_posts = POSTS_AMOUNT
         cls.second_page_len_posts = 3
-        cls.post = [
-            Post.objects.create(
+        cls.posts = [
+            Post(
                 text=f'Тестовый текст {i}',
                 author=cls.user_author,
                 group=cls.group,
@@ -164,9 +174,8 @@ class PaginatorViewTest(TestCase):
             for i in range(
                 cls.first_page_len_posts + cls.second_page_len_posts)
         ]
-
-    def setUp(self):
-        self.client = Client()
+        Post.objects.bulk_create(cls.posts)
+        cls.posts = Post.objects.select_related('author', 'group')
 
     def test_pages_pagination(self):
         """Проверка правильности вывода количества постов на страницах."""

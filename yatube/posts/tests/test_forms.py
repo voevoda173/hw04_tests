@@ -28,8 +28,8 @@ class PostFormTests(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.author)
 
-    def test_create_post(self):
-        """Проверка добавления поста в базу данных."""
+    def test_authorized_user_create_post(self):
+        """Проверка создания записи авторизированным клиентом."""
         post_count = Post.objects.count()
         form_data = {
             'text': 'Новый пост',
@@ -47,8 +47,8 @@ class PostFormTests(TestCase):
             ).exists()
         )
 
-    def test_post_edit(self):
-        """Проверка изменения поста при его редактировании."""
+    def test_author_user_edit_post(self):
+        """Проверка изменения поста при его редактировании автором."""
         form_data = {
             'text': 'Отредактированный пост',
             'author': self.author,
